@@ -1,8 +1,10 @@
 # vLLM Dashboard
 
-A single-page, self-hosted usage/cost/health dashboard for a local **vLLM** (or **SGLang**) OpenAI-compatible server. Scrapes the server's own Prometheus `/metrics` endpoint — no changes to your inference server required.
+A single-page, self-hosted usage/cost/health dashboard for a local **vLLM** OpenAI-compatible server. Scrapes vLLM's own Prometheus `/metrics` endpoint — no changes to your inference server required.
 
 ![Dashboard screenshot](docs/screenshot.png)
+
+**Also works with SGLang.** The metric scraper tries both vLLM's and SGLang's metric names for every field (they overlap heavily), so this runs unmodified against either server — that's also why the metrics-endpoint env var below is named `SGLANG_METRICS_URL` rather than something vLLM-specific: it accepts either server's `/metrics` URL.
 
 ## What it shows
 
@@ -24,7 +26,7 @@ Self-hosting an LLM makes cost and performance invisible unless you build someth
 ```bash
 pip install -r requirements.txt
 
-# point at your vLLM/SGLang server's Prometheus metrics endpoint (default shown)
+# point at your vLLM (or SGLang) server's Prometheus metrics endpoint (default shown)
 export SGLANG_METRICS_URL=http://127.0.0.1:8000/metrics
 
 # the OpenRouter model id to compare cost against (see https://openrouter.ai/models)
@@ -39,7 +41,7 @@ Open `http://localhost:8765/`.
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `SGLANG_METRICS_URL` | `http://127.0.0.1:8000/metrics` | Your server's Prometheus metrics endpoint |
+| `SGLANG_METRICS_URL` | `http://127.0.0.1:8000/metrics` | Your server's Prometheus metrics endpoint — works for vLLM or SGLang despite the name |
 | `OPENROUTER_MODEL` | `deepseek/deepseek-chat` | Model id to price against on OpenRouter |
 | `METRICS_DB` | `./metrics.db` | SQLite file for history |
 | `METRICS_POLL_INTERVAL` | `30` | Seconds between metric polls |
