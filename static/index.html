@@ -1,0 +1,1161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>DeepSeek-V4-Flash · vLLM</title>
+  <style>
+    :root {
+      --bg:        #0f1116;
+      --surface:   #161a21;
+      --panel:     #1d2128;
+      --panel2:    #242930;
+      --border:    #2b3040;
+      --border2:   #38404f;
+      --text:      #dde1ea;
+      --sub:       #8792a4;
+      --dim:       #4e5666;
+      --teal:      #00c896;
+      --teal-dk:   #00a07a;
+      --blue:      #4d8cf8;
+      --blue-dk:   #2d6ef0;
+      --amber:     #ffa947;
+      --amber-dk:  #e08020;
+      --red:       #f06060;
+      --green:     #3dd98c;
+      --green-dk:  #22b469;
+      --white:     #f0f4ff;
+      --mono:      "SF Mono", "Fira Code", "Cascadia Code", ui-monospace, monospace;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    /* ── topbar ── */
+    .topbar {
+      height: 52px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 1.5rem;
+      gap: 1.5rem;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .topbar-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--white);
+      letter-spacing: -0.01em;
+    }
+    .brand-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--teal);
+      box-shadow: 0 0 8px var(--teal);
+    }
+    .topbar-model {
+      font-size: 0.78rem;
+      color: var(--sub);
+      font-family: var(--mono);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.2rem 0.55rem;
+    }
+    .topbar-spacer { flex: 1; }
+    .topbar-status {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.78rem;
+      color: var(--sub);
+    }
+    .live-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: livepulse 2s ease-in-out infinite;
+    }
+    .live-dot.stale { background: var(--amber); animation: none; }
+    .live-dot.err   { background: var(--red);   animation: none; }
+    @keyframes livepulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: .45; }
+    }
+    .topbar-home {
+      color: var(--sub);
+      text-decoration: none;
+      font-size: 0.78rem;
+      padding: 0.3rem 0.7rem;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      transition: color .15s, border-color .15s, background .15s;
+    }
+    .topbar-home:hover { color: var(--text); border-color: var(--border2); background: var(--panel); }
+
+    /* ── layout ── */
+    .page { max-width: 1160px; margin: 0 auto; padding: 1.5rem 1.5rem 4rem; }
+
+    /* ── section label ── */
+    .section-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: var(--dim);
+      margin-bottom: 0.75rem;
+    }
+
+    /* ── stat row ── */
+    .stat-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 1.25rem;
+    }
+    @media (max-width: 760px) {
+      .stat-row { grid-template-columns: repeat(2, 1fr); }
+    }
+    .stat-cell {
+      background: var(--panel);
+      padding: 1.25rem 1.4rem;
+      transition: background .15s;
+    }
+    .stat-cell:hover { background: var(--panel2); }
+    .stat-lbl {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      color: var(--sub);
+      margin-bottom: 0.5rem;
+    }
+    .stat-val {
+      font-size: 1.9rem;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      line-height: 1;
+      font-family: var(--mono);
+    }
+    .stat-val.teal  { color: var(--teal); }
+    .stat-val.blue  { color: var(--blue); }
+    .stat-val.amber { color: var(--amber); }
+    .stat-val.green { color: var(--green); }
+    .stat-val.white { color: var(--white); }
+    .stat-note {
+      font-size: 0.73rem;
+      color: var(--dim);
+      margin-top: 0.35rem;
+      font-family: var(--mono);
+    }
+
+    /* ── main grid ── */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+    @media (max-width: 700px) { .main-grid { grid-template-columns: 1fr; } }
+
+    /* ── panel ── */
+    .panel-box {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .panel-header {
+      padding: 0.85rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .panel-title {
+      font-size: 0.73rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .09em;
+      color: var(--sub);
+    }
+    .panel-tag {
+      font-size: 0.68rem;
+      color: var(--dim);
+      font-family: var(--mono);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 0.1rem 0.45rem;
+    }
+    .panel-body { padding: 1.25rem; }
+
+    /* ── cost table ── */
+    .cost-table { width: 100%; border-collapse: collapse; }
+    .cost-table tr { border-bottom: 1px solid var(--border); }
+    .cost-table tr:last-child { border-bottom: none; }
+    .cost-table td {
+      padding: 0.6rem 0;
+      font-size: 0.84rem;
+      vertical-align: middle;
+    }
+    .cost-table td:last-child {
+      text-align: right;
+      font-family: var(--mono);
+      font-weight: 600;
+      font-size: 0.88rem;
+      color: var(--text);
+    }
+    .cost-table .rate-hint {
+      font-size: 0.68rem;
+      color: var(--dim);
+      font-family: var(--mono);
+      display: block;
+    }
+    .cost-table .td-label { color: var(--sub); }
+    .cost-table tr.total-row td { padding-top: 0.85rem; }
+    .cost-table .total-label { color: var(--text); font-weight: 600; }
+    .cost-table .total-val {
+      color: var(--blue) !important;
+      font-size: 1.1rem !important;
+    }
+    .cost-table .nocache-val { color: var(--amber) !important; }
+
+    /* ── savings hero ── */
+    .savings-hero {
+      text-align: center;
+      padding: 1.5rem 1rem 1.2rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .sh-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: var(--dim);
+      margin-bottom: 0.5rem;
+    }
+    .sh-amount {
+      font-size: 2.8rem;
+      font-weight: 900;
+      letter-spacing: -0.05em;
+      color: var(--teal);
+      font-family: var(--mono);
+      line-height: 1;
+      text-shadow: 0 0 40px rgba(0,200,150,.25);
+    }
+    .sh-sub {
+      font-size: 0.72rem;
+      color: var(--dim);
+      margin-top: 0.45rem;
+      line-height: 1.4;
+    }
+
+    /* ── token bars ── */
+    .bars { padding: 1rem 1.25rem 1.25rem; }
+    .bar-item { margin-bottom: 0.9rem; }
+    .bar-item:last-child { margin-bottom: 0; }
+    .bar-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 0.3rem;
+    }
+    .bar-name { font-size: 0.75rem; color: var(--sub); }
+    .bar-count { font-size: 0.75rem; font-family: var(--mono); color: var(--text); font-weight: 600; }
+    .bar-track {
+      height: 6px;
+      background: var(--surface);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.7s cubic-bezier(.4,0,.2,1);
+    }
+    .bf-blue   { background: linear-gradient(90deg, var(--blue-dk),  var(--blue)); }
+    .bf-teal   { background: linear-gradient(90deg, var(--teal-dk),  var(--teal)); }
+    .bf-green  { background: linear-gradient(90deg, var(--green-dk), var(--green)); }
+
+    /* ── history table ── */
+    .history-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .history-table thead tr {
+      border-bottom: 1px solid var(--border2);
+    }
+    .history-table th {
+      padding: 0.5rem 0.75rem;
+      font-size: 0.67rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .09em;
+      color: var(--dim);
+      text-align: right;
+    }
+    .history-table th:first-child { text-align: left; }
+    .history-table tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background .12s;
+    }
+    .history-table tbody tr:last-child { border-bottom: none; }
+    .history-table tbody tr:hover { background: var(--panel2); }
+    .history-table td {
+      padding: 0.7rem 0.75rem;
+      font-size: 0.84rem;
+      text-align: right;
+      font-family: var(--mono);
+      color: var(--sub);
+    }
+    .history-table td:first-child {
+      text-align: left;
+      font-family: inherit;
+      color: var(--text);
+      font-weight: 600;
+    }
+    .history-table .ht-tokens { color: var(--white); }
+    .history-table .ht-cost   { color: var(--teal); }
+    .history-table .ht-zero   { color: var(--dim); }
+    .history-table .ht-period-chip {
+      display: inline-block;
+      font-size: 0.67rem;
+      font-family: var(--mono);
+      color: var(--dim);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 0.05rem 0.4rem;
+      margin-left: 0.4rem;
+      vertical-align: middle;
+      font-weight: 400;
+    }
+    .daily-table-wrap {
+      max-height: 420px;
+      overflow-y: auto;
+    }
+    .daily-table-wrap thead th {
+      position: sticky;
+      top: 0;
+      background: var(--panel);
+    }
+
+    /* ── daily trend chart ── */
+    .daily-chart {
+      display: flex;
+      align-items: flex-end;
+      gap: 5px;
+      height: 150px;
+      padding-top: 1.1rem;
+    }
+    .daily-col {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      height: 100%;
+      min-width: 0;
+    }
+    .daily-bar {
+      width: 100%;
+      max-width: 34px;
+      background: linear-gradient(180deg, var(--teal), var(--teal-dk));
+      border-radius: 3px 3px 0 0;
+      min-height: 2px;
+      transition: height .7s cubic-bezier(.4,0,.2,1);
+    }
+    .daily-col.today .daily-bar { background: linear-gradient(180deg, var(--blue), var(--blue-dk)); }
+    .daily-cost {
+      font-size: 0.6rem;
+      font-family: var(--mono);
+      color: var(--sub);
+      margin-bottom: 3px;
+      white-space: nowrap;
+    }
+    .daily-x {
+      font-size: 0.62rem;
+      font-family: var(--mono);
+      color: var(--dim);
+      margin-top: 5px;
+    }
+    .daily-col.today .daily-x { color: var(--blue); font-weight: 700; }
+
+    /* ── status bar ── */
+    .status-bar {
+      display: flex;
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .status-cell {
+      flex: 1;
+      background: var(--panel);
+      padding: 0.85rem 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      transition: background .15s;
+    }
+    .status-cell:hover { background: var(--panel2); }
+    .sc-icon {
+      font-size: 1rem;
+      line-height: 1;
+      opacity: .75;
+    }
+    .sc-body {}
+    .sc-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: .07em; color: var(--dim); }
+    .sc-value { font-size: 0.9rem; font-weight: 700; font-family: var(--mono); color: var(--text); margin-top: 1px; }
+    .sc-value.ok     { color: var(--green); }
+    .sc-value.busy   { color: var(--amber); }
+    .sc-value.queue  { color: var(--red); }
+    .sc-value.recording { color: var(--teal); }
+    .sc-value.nodata    { color: var(--amber); }
+    @media (max-width: 600px) { .status-bar { flex-wrap: wrap; } }
+
+    /* ── error ── */
+    .err-strip {
+      display: none;
+      background: rgba(240,96,96,.08);
+      border: 1px solid rgba(240,96,96,.2);
+      border-radius: 8px;
+      padding: 0.65rem 1rem;
+      font-size: 0.8rem;
+      color: var(--red);
+      margin-bottom: 1.25rem;
+      font-family: var(--mono);
+    }
+    .err-strip.show { display: block; }
+  </style>
+</head>
+<body>
+
+<!-- top bar -->
+<nav class="topbar">
+  <div class="topbar-brand">
+    <div class="brand-dot" id="live-dot-outer"></div>
+    Dashboard
+  </div>
+  <span class="topbar-model" id="top-model">DeepSeek-V4-Flash · vLLM</span>
+  <div class="topbar-spacer"></div>
+  <div class="topbar-status">
+    <div class="live-dot" id="live-dot"></div>
+    <span id="last-updated">connecting…</span>
+  </div>
+  <a href="/" class="topbar-home">← Back</a>
+</nav>
+
+<div class="page">
+
+  <!-- error strip -->
+  <div class="err-strip" id="err-strip"></div>
+
+  <!-- session kpi row -->
+  <div class="section-label">This Session <span style="color:var(--dim);font-weight:400;text-transform:none;letter-spacing:0">— resets on vLLM restart</span></div>
+  <div class="stat-row">
+    <div class="stat-cell">
+      <div class="stat-lbl">Total Tokens</div>
+      <div class="stat-val white" id="kpi-total">—</div>
+      <div class="stat-note">prompt + completion</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-lbl">Prompt Tokens</div>
+      <div class="stat-val blue" id="kpi-prompt">—</div>
+      <div class="stat-note" id="kpi-prompt-note">—</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-lbl">Completion Tokens</div>
+      <div class="stat-val teal" id="kpi-gen">—</div>
+      <div class="stat-note" id="kpi-gen-note">—</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-lbl">Cache Hit Rate</div>
+      <div class="stat-val amber" id="kpi-cache">—</div>
+      <div class="stat-note" id="kpi-cache-note">—</div>
+    </div>
+  </div>
+
+  <!-- main panels -->
+  <div class="main-grid">
+
+    <!-- cost breakdown -->
+    <div class="panel-box">
+      <div class="panel-header">
+        <span class="panel-title">OpenRouter Equivalent Cost</span>
+        <span class="panel-tag" id="or-model-tag">~deepseek/deepseek-v4-flash-latest</span>
+      </div>
+      <div class="panel-body">
+        <table class="cost-table">
+          <tbody>
+            <tr>
+              <td class="td-label">
+                Prompt — uncached
+                <span class="rate-hint" id="rate-prompt">—</span>
+              </td>
+              <td id="cost-prompt">—</td>
+            </tr>
+            <tr>
+              <td class="td-label">
+                Prompt — token queries
+                <span class="rate-hint" id="rate-cached">—</span>
+              </td>
+              <td id="cost-cached">—</td>
+            </tr>
+            <tr>
+              <td class="td-label">
+                Completion
+                <span class="rate-hint" id="rate-gen">—</span>
+              </td>
+              <td id="cost-gen">—</td>
+            </tr>
+            <tr class="total-row">
+              <td class="total-label">Total (with cache not available)</td>
+              <td class="total-val" id="cost-total">—</td>
+            </tr>
+            <tr>
+              <td class="td-label">Total (no cache discount)</td>
+              <td class="nocache-val" id="cost-nocache">—</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- savings + bars -->
+    <div class="panel-box">
+      <div class="savings-hero">
+        <div class="sh-label">Running Locally Saves You</div>
+        <div class="sh-amount" id="savings-val">—</div>
+        <div class="sh-sub" id="savings-sub">vs equivalent usage on OpenRouter</div>
+      </div>
+      <div class="bars">
+        <div class="bar-item">
+          <div class="bar-meta">
+            <span class="bar-name">Prompt — uncached</span>
+            <span class="bar-count" id="bv-prompt">—</span>
+          </div>
+          <div class="bar-track"><div class="bar-fill bf-blue" id="b-prompt" style="width:0"></div></div>
+        </div>
+        <div class="bar-item">
+          <div class="bar-meta">
+            <span class="bar-name">Prompt — cached</span>
+            <span class="bar-count" id="bv-cached">—</span>
+          </div>
+          <div class="bar-track"><div class="bar-fill bf-teal" id="b-cached" style="width:0"></div></div>
+        </div>
+        <div class="bar-item">
+          <div class="bar-meta">
+            <span class="bar-name">Completion tokens</span>
+            <span class="bar-count" id="bv-gen">—</span>
+          </div>
+          <div class="bar-track"><div class="bar-fill bf-green" id="b-gen" style="width:0"></div></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main-grid -->
+
+  <!-- usage history -->
+  <div class="section-label" style="margin-top:0.25rem">Usage History <span style="color:var(--dim);font-weight:400;text-transform:none;letter-spacing:0">— persists across restarts</span></div>
+  <div class="panel-box" style="margin-bottom:1.25rem">
+    <table class="history-table">
+      <thead>
+        <tr>
+          <th>Period</th>
+          <th>Total Tokens</th>
+          <th>Prompt</th>
+          <th>Completion</th>
+          <th>Requests</th>
+          <th>Est. Cost</th>
+        </tr>
+      </thead>
+      <tbody id="history-tbody">
+        <tr><td colspan="6" style="text-align:center;color:var(--dim);padding:1.5rem">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 14-day trend -->
+  <div class="section-label" style="margin-top:0.25rem">14-Day Trend <span style="color:var(--dim);font-weight:400;text-transform:none;letter-spacing:0">— total tokens &amp; est. OpenRouter cost per day</span></div>
+  <div class="panel-box" style="margin-bottom:1.25rem">
+    <div class="panel-body">
+      <div class="daily-chart" id="daily-chart">
+        <div style="width:100%;text-align:center;color:var(--dim);font-size:.8rem">Loading…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- full daily cost history -->
+  <div class="section-label" style="margin-top:0.25rem">Every Day <span class="ht-period-chip" id="daily-all-count">—</span></div>
+  <div class="panel-box daily-table-wrap" style="margin-bottom:1.25rem">
+    <table class="history-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Total Tokens</th>
+          <th>Prompt</th>
+          <th>Completion</th>
+          <th>Requests</th>
+          <th>Est. Cost</th>
+        </tr>
+      </thead>
+      <tbody id="daily-all-tbody">
+        <tr><td colspan="6" style="text-align:center;color:var(--dim);padding:1.5rem">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- performance history -->
+  <div class="section-label" style="margin-top:0.25rem">Performance History <span style="color:var(--dim);font-weight:400;text-transform:none;letter-spacing:0">— latency &amp; health averages, persists across restarts</span></div>
+  <div class="panel-box" style="margin-bottom:1.25rem">
+    <table class="history-table">
+      <thead>
+        <tr>
+          <th>Period</th>
+          <th>Avg TTFT</th>
+          <th>Avg Queue Wait</th>
+          <th>Decode Speed/Req</th>
+          <th>Preemptions</th>
+          <th>Success Rate</th>
+        </tr>
+      </thead>
+      <tbody id="perf-history-tbody">
+        <tr><td colspan="6" style="text-align:center;color:var(--dim);padding:1.5rem">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 14-day health trend -->
+  <div class="section-label" style="margin-top:0.25rem">14-Day Health Trend <span style="color:var(--dim);font-weight:400;text-transform:none;letter-spacing:0">— preemptions per day (bar) &amp; success rate (hover)</span></div>
+  <div class="panel-box" style="margin-bottom:1.25rem">
+    <div class="panel-body">
+      <div class="daily-chart" id="daily-perf-chart">
+        <div style="width:100%;text-align:center;color:var(--dim);font-size:.8rem">Loading…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- live status bar -->
+  <div class="section-label">GPU Status <span class="ht-period-chip" id="gpu-uptime">—</span></div>
+  <div class="status-bar" id="gpu-status-bar">
+    <div style="padding:0.6rem 0.85rem;color:var(--dim);font-size:.8rem">Loading…</div>
+  </div>
+
+  <div class="section-label">Live Engine Status</div>
+  <div class="status-bar">
+    <div class="status-cell">
+      <div class="sc-icon">⚡</div>
+      <div class="sc-body">
+        <div class="sc-label">Output tok/s</div>
+        <div class="sc-value" id="sc-tps">—</div>
+      </div>
+    </div>
+    <div class="status-cell">
+      <div class="sc-icon">🔁</div>
+      <div class="sc-body">
+        <div class="sc-label">Requests/s</div>
+        <div class="sc-value" id="sc-rps">—</div>
+      </div>
+    </div>
+    <div class="status-cell">
+      <div class="sc-icon">⚙</div>
+      <div class="sc-body">
+        <div class="sc-label">Requests Running</div>
+        <div class="sc-value" id="sc-running">—</div>
+      </div>
+    </div>
+    <div class="status-cell">
+      <div class="sc-icon">⏳</div>
+      <div class="sc-body">
+        <div class="sc-label">Queued</div>
+        <div class="sc-value" id="sc-waiting">—</div>
+      </div>
+    </div>
+    <div class="status-cell">
+      <div class="sc-icon">🗄</div>
+      <div class="sc-body">
+        <div class="sc-label">KV Cache Used</div>
+        <div class="sc-value" id="sc-kv">—</div>
+      </div>
+    </div>
+    <div class="status-cell">
+      <div class="sc-icon">✓</div>
+      <div class="sc-body">
+        <div class="sc-label">Total Requests</div>
+        <div class="sc-value" id="sc-reqs">—</div>
+      </div>
+    </div>
+    <div class="status-cell">
+      <div class="sc-icon">⬛</div>
+      <div class="sc-body">
+        <div class="sc-label">Max Context</div>
+        <div class="sc-value" id="sc-ctx">—</div>
+      </div>
+    </div>
+    <div class="status-cell">
+      <div class="sc-icon">💾</div>
+      <div class="sc-body">
+        <div class="sc-label">DB Recording</div>
+        <div class="sc-value" id="sc-db">—</div>
+      </div>
+    </div>
+    <div class="status-cell" title="Avg time to first token, last poll interval">
+      <div class="sc-icon">🚀</div>
+      <div class="sc-body">
+        <div class="sc-label">Avg TTFT</div>
+        <div class="sc-value" id="sc-ttft">—</div>
+      </div>
+    </div>
+    <div class="status-cell" title="Avg per-request decode speed, last poll interval">
+      <div class="sc-icon">🐇</div>
+      <div class="sc-body">
+        <div class="sc-label">Decode Speed/Req</div>
+        <div class="sc-value" id="sc-itl">—</div>
+      </div>
+    </div>
+    <div class="status-cell" title="Avg time a request waits before scheduling, last poll interval">
+      <div class="sc-icon">⏱</div>
+      <div class="sc-body">
+        <div class="sc-label">Avg Queue Wait</div>
+        <div class="sc-value" id="sc-queue">—</div>
+      </div>
+    </div>
+    <div class="status-cell" title="Avg end-to-end request latency, last poll interval">
+      <div class="sc-icon">🏁</div>
+      <div class="sc-body">
+        <div class="sc-label">Avg Request Time</div>
+        <div class="sc-value" id="sc-e2e">—</div>
+      </div>
+    </div>
+    <div class="status-cell" title="Requests preempted (KV cache pressure) — lifetime / this interval">
+      <div class="sc-icon">🧯</div>
+      <div class="sc-body">
+        <div class="sc-label">Preemptions</div>
+        <div class="sc-value" id="sc-preempt">—</div>
+      </div>
+    </div>
+    <div class="status-cell" title="Share of finished requests that ended naturally (stop), last poll interval">
+      <div class="sc-icon">✅</div>
+      <div class="sc-body">
+        <div class="sc-label">Finish OK Rate</div>
+        <div class="sc-value" id="sc-finish">—</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /page -->
+
+<script>
+"use strict";
+const API  = "/vllm-api/all";
+const POLL = 10_000;
+
+const $ = id => document.getElementById(id);
+const set = (id, v) => { const e = $(id); if (e) e.textContent = v; };
+const setW = (id, pct) => { const e = $(id); if (e) e.style.width = Math.min(100, Math.max(0, pct)) + "%"; };
+
+function fmtT(n) {
+  if (n == null || isNaN(n)) return "—";
+  if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
+  if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + "K";
+  return n.toLocaleString();
+}
+
+function fmtUSD(n) {
+  if (n == null || isNaN(n)) return "—";
+  if (n === 0) return "$0.00";
+  if (n >= 1000) return "$" + n.toLocaleString("en-US", { maximumFractionDigits: 0 });
+  if (n >= 100)  return "$" + n.toFixed(1);
+  if (n >= 1)    return "$" + n.toFixed(2);
+  if (n >= 0.001) return "$" + n.toFixed(4);
+  return "$" + n.toFixed(6);
+}
+
+function rateM(perTok) { return "$" + (perTok * 1e6).toFixed(2) + " / M tok"; }
+
+function relTime(ts) {
+  const s = Math.round(Date.now() / 1000 - ts);
+  if (s < 5)  return "Live";
+  if (s < 60) return `${s}s ago`;
+  return `${Math.round(s / 60)}m ago`;
+}
+
+let lastTs = null;
+
+function applyClasses(id, cls) {
+  const e = $(id);
+  if (!e) return;
+  e.className = e.className.replace(/\b(ok|busy|queue|recording|nodata)\b/g, "");
+  if (cls) e.classList.add(cls);
+}
+
+// ── history table ──
+
+const HISTORY_PERIODS = [
+  { key: "today",     label: "Today" },
+  { key: "yesterday", label: "Yesterday" },
+  { key: "week",      label: "Last 7 days" },
+  { key: "month",     label: "This month" },
+  { key: "year",      label: "This year" },
+  { key: "all_time",  label: "All Time" },
+];
+
+function renderHistory(history) {
+  if (!history) return;
+  const tbody = $("history-tbody");
+  const rows = HISTORY_PERIODS.map(({ key, label }) => {
+    const d = history[key];
+    if (!d) return "";
+    const empty = d.total_tokens === 0;
+    const cls = empty ? "ht-zero" : "";
+    const cost = d.cost_usd != null
+      ? `<span class="${empty ? "ht-zero" : "ht-cost"}">${fmtUSD(d.cost_usd)}</span>`
+      : `<span class="ht-zero">—</span>`;
+    const totalRow = key === "all_time" ? ' style="border-top:2px solid var(--border2)"' : "";
+    return `<tr${totalRow}>
+      <td>${label}</td>
+      <td class="${empty ? "ht-zero" : "ht-tokens"}">${fmtT(d.total_tokens)}</td>
+      <td class="${cls}">${fmtT(d.prompt_tokens)}</td>
+      <td class="${cls}">${fmtT(d.gen_tokens)}</td>
+      <td class="${cls}">${d.requests > 0 ? d.requests.toLocaleString() : "—"}</td>
+      <td>${cost}</td>
+    </tr>`;
+  }).join("");
+  tbody.innerHTML = rows || `<tr><td colspan="6" style="text-align:center;color:var(--dim);padding:1.5rem">No data yet</td></tr>`;
+}
+
+// ── 14-day trend chart ──
+
+function renderDaily(daily) {
+  const el = $("daily-chart");
+  if (!el || !Array.isArray(daily) || !daily.length) return;
+  const max = Math.max(1, ...daily.map(d => d.total_tokens));
+  el.innerHTML = daily.map((d, i) => {
+    const h = Math.max(d.total_tokens > 0 ? 3 : 0, Math.round(d.total_tokens / max * 100));
+    const today = i === daily.length - 1;
+    const cost = d.cost_usd != null ? fmtUSD(d.cost_usd) : "";
+    const title = `${d.date}\n${fmtT(d.total_tokens)} tokens · ${d.requests.toLocaleString()} req` +
+                  (d.cost_usd != null ? `\n${fmtUSD(d.cost_usd)} est.` : "");
+    return `<div class="daily-col${today ? " today" : ""}" title="${title}">
+      <div class="daily-cost">${d.total_tokens ? cost : ""}</div>
+      <div class="daily-bar" style="height:${h}%"></div>
+      <div class="daily-x">${d.label}</div>
+    </div>`;
+  }).join("");
+}
+
+// ── full daily cost history (every day recorded, newest first) ──
+
+function renderDailyAll(dailyAll) {
+  const tbody = $("daily-all-tbody");
+  const countEl = $("daily-all-count");
+  if (!tbody || !Array.isArray(dailyAll)) return;
+  if (countEl) countEl.textContent = `${dailyAll.length} day${dailyAll.length === 1 ? "" : "s"}`;
+  const rows = dailyAll.slice().reverse().map(d => {
+    const empty = d.total_tokens === 0;
+    const cls = empty ? "ht-zero" : "";
+    const cost = d.cost_usd != null
+      ? `<span class="${empty ? "ht-zero" : "ht-cost"}">${fmtUSD(d.cost_usd)}</span>`
+      : `<span class="ht-zero">—</span>`;
+    return `<tr>
+      <td>${d.date} <span style="color:var(--dim);font-weight:400">${d.label}</span></td>
+      <td class="${empty ? "ht-zero" : "ht-tokens"}">${fmtT(d.total_tokens)}</td>
+      <td class="${cls}">${fmtT(d.prompt_tokens)}</td>
+      <td class="${cls}">${fmtT(d.gen_tokens)}</td>
+      <td class="${cls}">${d.requests > 0 ? d.requests.toLocaleString() : "—"}</td>
+      <td>${cost}</td>
+    </tr>`;
+  }).join("");
+  tbody.innerHTML = rows || `<tr><td colspan="6" style="text-align:center;color:var(--dim);padding:1.5rem">No data yet</td></tr>`;
+}
+
+// ── performance history table ──
+
+function fmtMs(ms) {
+  if (ms == null) return "—";
+  return ms >= 1000 ? (ms / 1000).toFixed(1) + "s" : Math.round(ms) + "ms";
+}
+
+function renderPerfHistory(history) {
+  if (!history) return;
+  const tbody = $("perf-history-tbody");
+  const rows = HISTORY_PERIODS.map(({ key, label }) => {
+    const d = history[key];
+    const p = d && d.perf;
+    if (!p) return "";
+    const empty = d.total_tokens === 0;
+    const cls = empty ? "ht-zero" : "";
+    const rate = p.success_rate_pct != null
+      ? `<span class="${p.success_rate_pct < 95 ? "" : "ht-cost"}" style="${p.success_rate_pct < 95 ? "color:var(--red)" : ""}">${p.success_rate_pct.toFixed(1)}%</span>`
+      : `<span class="ht-zero">—</span>`;
+    const totalRow = key === "all_time" ? ' style="border-top:2px solid var(--border2)"' : "";
+    return `<tr${totalRow}>
+      <td>${label}</td>
+      <td class="${cls}">${fmtMs(p.ttft_avg_ms)}</td>
+      <td class="${cls}">${fmtMs(p.queue_avg_ms)}</td>
+      <td class="${cls}">${p.decode_tok_per_s_per_req != null ? p.decode_tok_per_s_per_req.toFixed(1) + " tok/s" : "—"}</td>
+      <td class="${p.preemptions > 0 ? "" : cls}" style="${p.preemptions > 0 ? "color:var(--amber)" : ""}">${p.preemptions.toLocaleString()}</td>
+      <td>${rate}</td>
+    </tr>`;
+  }).join("");
+  tbody.innerHTML = rows || `<tr><td colspan="6" style="text-align:center;color:var(--dim);padding:1.5rem">No data yet</td></tr>`;
+}
+
+// ── 14-day health trend chart (preemptions per day) ──
+
+function renderDailyPerf(daily) {
+  const el = $("daily-perf-chart");
+  if (!el || !Array.isArray(daily) || !daily.length) return;
+  const max = Math.max(1, ...daily.map(d => (d.perf && d.perf.preemptions) || 0));
+  el.innerHTML = daily.map((d, i) => {
+    const p = d.perf || {};
+    const n = p.preemptions || 0;
+    const h = Math.max(n > 0 ? 3 : 0, Math.round(n / max * 100));
+    const today = i === daily.length - 1;
+    const title = `${d.date}` +
+                  `\n${n.toLocaleString()} preemption${n === 1 ? "" : "s"}` +
+                  (p.success_rate_pct != null ? `\n${p.success_rate_pct.toFixed(1)}% success rate` : "") +
+                  (p.ttft_avg_ms != null ? `\navg TTFT ${fmtMs(p.ttft_avg_ms)}` : "") +
+                  (p.queue_avg_ms != null ? `\navg queue ${fmtMs(p.queue_avg_ms)}` : "");
+    return `<div class="daily-col${today ? " today" : ""}" title="${title}">
+      <div class="daily-cost">${n > 0 ? n.toLocaleString() : ""}</div>
+      <div class="daily-bar" style="height:${h}%${n === 0 ? ";background:var(--border2)" : ""}"></div>
+      <div class="daily-x">${d.label}</div>
+    </div>`;
+  }).join("");
+}
+
+// ── live throughput (delta between polls) ──
+
+let prevSample = null;
+
+// ── GPU hardware status ──
+
+function fmtUptime(startedAtIso) {
+  if (!startedAtIso) return "—";
+  const started = new Date(startedAtIso).getTime();
+  if (isNaN(started)) return "—";
+  const s = Math.max(0, Math.round((Date.now() - started) / 1000));
+  const days = Math.floor(s / 86400);
+  const hours = Math.floor((s % 86400) / 3600);
+  if (days > 0) return `up ${days}d ${hours}h`;
+  const mins = Math.floor((s % 3600) / 60);
+  return hours > 0 ? `up ${hours}h ${mins}m` : `up ${mins}m`;
+}
+
+function renderGpus(gpus, startedAt) {
+  const el = $("gpu-status-bar");
+  set("gpu-uptime", fmtUptime(startedAt));
+  if (!el) return;
+  if (!Array.isArray(gpus) || !gpus.length) {
+    el.innerHTML = `<div style="padding:0.6rem 0.85rem;color:var(--dim);font-size:.8rem">nvidia-smi unavailable</div>`;
+    return;
+  }
+  el.innerHTML = gpus.map(g => {
+    const cls = g.memory_pct > 97 || g.temperature_c > 85 ? "queue"
+              : g.memory_pct > 90 || g.temperature_c > 75 ? "busy" : "ok";
+    const title = `${g.name}\n${g.memory_used_mb.toLocaleString()} / ${g.memory_total_mb.toLocaleString()} MB\n${g.power_draw_w.toFixed(0)}W / ${g.power_limit_w.toFixed(0)}W limit`;
+    return `<div class="status-cell" title="${title}">
+      <div class="sc-icon">🖥</div>
+      <div class="sc-body">
+        <div class="sc-label">GPU ${g.index}</div>
+        <div class="sc-value ${cls}">${g.utilization_pct.toFixed(0)}% · ${g.memory_pct.toFixed(0)}% mem · ${g.temperature_c.toFixed(0)}°C</div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+// ── main render ──
+
+function renderPerf(perf) {
+  if (!perf) return;
+
+  set("sc-ttft", perf.ttft_avg_ms != null ? (perf.ttft_avg_ms >= 1000
+    ? (perf.ttft_avg_ms / 1000).toFixed(1) + "s" : Math.round(perf.ttft_avg_ms) + "ms") : "—");
+  applyClasses("sc-ttft", perf.ttft_avg_ms == null ? "" :
+    perf.ttft_avg_ms > 5000 ? "queue" : perf.ttft_avg_ms > 2000 ? "busy" : "ok");
+
+  set("sc-itl", perf.decode_tok_per_s_per_req != null ? perf.decode_tok_per_s_per_req.toFixed(1) + " tok/s" : "—");
+
+  set("sc-queue", perf.queue_avg_ms != null ? (perf.queue_avg_ms >= 1000
+    ? (perf.queue_avg_ms / 1000).toFixed(1) + "s" : Math.round(perf.queue_avg_ms) + "ms") : "—");
+  applyClasses("sc-queue", perf.queue_avg_ms == null ? "" :
+    perf.queue_avg_ms > 3000 ? "queue" : perf.queue_avg_ms > 500 ? "busy" : "ok");
+
+  set("sc-e2e", perf.e2e_avg_s != null ? perf.e2e_avg_s.toFixed(1) + "s" : "—");
+
+  set("sc-preempt", `${perf.preemptions_total.toLocaleString()}${perf.preemptions_delta ? " (+" + perf.preemptions_delta + ")" : ""}`);
+  applyClasses("sc-preempt", perf.preemptions_delta > 0 ? "queue" : "ok");
+
+  set("sc-finish", perf.success_rate_pct != null ? perf.success_rate_pct.toFixed(1) + "%" : "—");
+  applyClasses("sc-finish", perf.success_rate_pct == null ? "" :
+    perf.success_rate_pct < 95 ? "queue" : perf.success_rate_pct < 99 ? "busy" : "ok");
+}
+
+function render({ stats, perf, openrouter, stats_error, openrouter_error, history, daily, daily_all, gpus, vllm_started_at, sidecar }) {
+  const errEl = $("err-strip");
+  const errs = [stats_error, openrouter_error].filter(Boolean);
+  if (errs.length) {
+    errEl.textContent = "⚠ " + errs.join("  ·  ");
+    errEl.classList.add("show");
+    $("live-dot").className = "live-dot err";
+  } else {
+    errEl.classList.remove("show");
+    $("live-dot").className = "live-dot";
+  }
+
+  // history + trend
+  renderHistory(history);
+  renderDaily(daily);
+  renderDailyAll(daily_all);
+  renderPerfHistory(history);
+  renderDailyPerf(daily);
+  renderPerf(perf);
+  renderGpus(gpus, vllm_started_at);
+
+  // sidecar health → DB cell
+  if (sidecar) {
+    const { last_poll_ok, last_poll_ts } = sidecar;
+    const lag = last_poll_ts ? Math.round(Date.now() / 1000 - last_poll_ts) : null;
+    if (!last_poll_ok) {
+      set("sc-db", "vLLM down");
+      applyClasses("sc-db", "nodata");
+    } else if (lag != null && lag < 150) {
+      set("sc-db", "Recording");
+      applyClasses("sc-db", "recording");
+    } else {
+      set("sc-db", lag != null ? `${lag}s lag` : "—");
+      applyClasses("sc-db", "nodata");
+    }
+  }
+
+  if (stats) {
+    const {
+      prompt_tokens, generation_tokens, total_tokens,
+      prompt_tokens_computed, prompt_tokens_cached,
+      prefix_cache_queries, prefix_cache_hits,
+      cache_hit_rate, total_requests,
+      requests_running, requests_waiting,
+      kv_cache_usage_pct, timestamp,
+    } = stats;
+
+    set("kpi-total",  fmtT(total_tokens));
+    set("kpi-prompt", fmtT(prompt_tokens));
+    set("kpi-prompt-note", `${fmtT(prompt_tokens_computed)} compute · ${fmtT(prompt_tokens_cached)} cached`);
+    set("kpi-gen",    fmtT(generation_tokens));
+    set("kpi-gen-note", `avg ${fmtT(Math.round(generation_tokens / Math.max(1, total_requests)))} / req`);
+    set("kpi-cache",  cache_hit_rate.toFixed(1) + "%");
+    set("kpi-cache-note", `${fmtT(prefix_cache_hits)} hits / ${fmtT(prefix_cache_queries)} queries`);
+
+    const maxTok = total_tokens || 1;
+    setW("b-prompt", prompt_tokens_computed / maxTok * 100);
+    setW("b-cached", prompt_tokens_cached   / maxTok * 100);
+    setW("b-gen",    generation_tokens      / maxTok * 100);
+    set("bv-prompt", fmtT(prompt_tokens_computed));
+    set("bv-cached", fmtT(prompt_tokens_cached));
+    set("bv-gen",    fmtT(generation_tokens));
+
+    // live output throughput from the delta since the previous poll
+    if (prevSample && timestamp > prevSample.ts) {
+      const dt = timestamp - prevSample.ts;
+      const dg = generation_tokens - prevSample.gen;
+      if (dg >= 0 && dt > 0) {
+        const tps = dg / dt;
+        set("sc-tps", tps >= 10 ? tps.toFixed(0) : tps.toFixed(1));
+        applyClasses("sc-tps", tps > 0 ? "busy" : "ok");
+      }
+      const dr = total_requests - prevSample.reqs;
+      if (dr >= 0 && dt > 0) {
+        const rps = dr / dt;
+        set("sc-rps", rps.toFixed(2));
+        applyClasses("sc-rps", rps > 0 ? "busy" : "ok");
+      }
+    }
+    if (timestamp) prevSample = { gen: generation_tokens, reqs: total_requests, ts: timestamp };
+
+    set("sc-running", requests_running);
+    set("sc-waiting", requests_waiting);
+    set("sc-kv", kv_cache_usage_pct.toFixed(1) + "%");
+    set("sc-reqs", total_requests.toLocaleString());
+
+    applyClasses("sc-running", requests_running > 0 ? "busy" : "ok");
+    applyClasses("sc-waiting", requests_waiting > 0 ? "queue" : "ok");
+    if (perf && perf.waiting_reasons) {
+      const wr = perf.waiting_reasons;
+      const waitEl = $("sc-waiting");
+      if (waitEl) waitEl.closest(".status-cell").title =
+        `Waiting on capacity: ${wr.capacity ?? 0} · deferred: ${wr.deferred ?? 0}`;
+    }
+
+    if (timestamp) { lastTs = timestamp; set("last-updated", relTime(timestamp)); }
+
+    if (openrouter) {
+      const { prompt_per_token, completion_per_token, cache_read_per_token, context_length, model_id } = openrouter;
+
+      const cPrompt  = prompt_tokens_computed * prompt_per_token;
+      const cCached  = prompt_tokens_cached   * cache_read_per_token;
+      const cGen     = generation_tokens      * completion_per_token;
+      const cTotal   = cPrompt + cCached + cGen;
+      const cNoCache = prompt_tokens * prompt_per_token + cGen;
+
+      set("cost-prompt",  fmtUSD(cPrompt));
+      set("cost-cached",  fmtUSD(cCached));
+      set("cost-gen",     fmtUSD(cGen));
+      set("cost-total",   fmtUSD(cTotal));
+      set("cost-nocache", fmtUSD(cNoCache));
+
+      set("rate-prompt", rateM(prompt_per_token));
+      set("rate-cached", rateM(cache_read_per_token));
+      set("rate-gen",    rateM(completion_per_token));
+      set("or-model-tag", model_id);
+
+      set("savings-val", fmtUSD(cNoCache));
+      set("savings-sub",
+        `vs ${rateM(prompt_per_token)} prompt · ${rateM(completion_per_token)} completion on OpenRouter`);
+
+      if (context_length) set("sc-ctx", fmtT(context_length) + " tok");
+    }
+  }
+}
+
+async function refresh() {
+  try {
+    const res = await fetch(API, { cache: "no-store" });
+    const data = await res.json();
+    render(data);
+  } catch (e) {
+    const el = $("err-strip");
+    el.textContent = "⚠ Network error: " + e.message;
+    el.classList.add("show");
+    $("live-dot").className = "live-dot err";
+  }
+}
+
+setInterval(() => { if (lastTs) set("last-updated", relTime(lastTs)); }, 2000);
+
+(async function loop() {
+  await refresh();
+  setTimeout(loop, POLL);
+})();
+</script>
+</body>
+</html>
